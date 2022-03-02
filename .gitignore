@@ -119,6 +119,14 @@ exps/
 *~
 mmdet3d/.mim
 
+# yckim
+model_zoo/
+nuscenes_gt_database_img/
+fcos_image/
+gt_database_img/
+gtc_nuimage/
+
+
 # Pytorch
 *.pth
 
