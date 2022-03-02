@@ -40,7 +40,7 @@ def parse_args():
         '--version',
         type=str,
         nargs='+',
-        default=['v1.0-mini'],
+        default=['v1.0-train'],
         required=False,
         help='specify the dataset version')
     parser.add_argument(

@@ -7,7 +7,7 @@ from .groupfree3dnet import GroupFree3DNet
 from .h3dnet import H3DNet
 from .imvotenet import ImVoteNet
 from .imvoxelnet import ImVoxelNet
-from .mvx_faster_rcnn import DynamicMVXFasterRCNN, MVXFasterRCNN
+from .mvx_faster_rcnn import DynamicMVXFasterRCNN, MVXFasterRCNN, DynamicMVXMultiFasterRCNN, MVXMultiFasterRCNN
 from .mvx_two_stage import MVXTwoStageDetector
 from .parta2 import PartA2
 from .single_stage_mono3d import SingleStageMono3DDetector
@@ -19,5 +19,5 @@ __all__ = [
     'Base3DDetector', 'VoxelNet', 'DynamicVoxelNet', 'MVXTwoStageDetector',
     'DynamicMVXFasterRCNN', 'MVXFasterRCNN', 'PartA2', 'VoteNet', 'H3DNet',
     'CenterPoint', 'SSD3DNet', 'ImVoteNet', 'SingleStageMono3DDetector',
-    'FCOSMono3D', 'ImVoxelNet', 'GroupFree3DNet'
+    'FCOSMono3D', 'ImVoxelNet', 'GroupFree3DNet', 'DynamicMVXMultiFasterRCNN', 'MVXMultiFasterRCNN'
 ]

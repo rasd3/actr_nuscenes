@@ -148,6 +148,7 @@ class NuScenesDataset(Custom3DDataset):
                 use_map=False,
                 use_external=False,
             )
+        self.PALETTE = None
 
     def get_cat_ids(self, idx):
         """Get category distribution of single scene.

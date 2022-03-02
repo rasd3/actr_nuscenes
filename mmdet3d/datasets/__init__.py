@@ -7,6 +7,7 @@ from .kitti_dataset import KittiDataset
 from .kitti_mono_dataset import KittiMonoDataset
 from .lyft_dataset import LyftDataset
 from .nuscenes_dataset import NuScenesDataset
+from .custom_nuscenes_dataset import CustomNuScenesDataset
 from .nuscenes_mono_dataset import NuScenesMonoDataset
 # yapf: disable
 from .pipelines import (BackgroundPointsFilter, GlobalAlignment,
@@ -37,6 +38,6 @@ __all__ = [
     'ScanNetDataset', 'ScanNetSegDataset', 'SemanticKITTIDataset',
     'Custom3DDataset', 'Custom3DSegDataset', 'LoadPointsFromMultiSweeps',
     'WaymoDataset', 'BackgroundPointsFilter', 'VoxelBasedPointSampler',
-    'get_loading_pipeline', 'RandomDropPointsColor', 'RandomJitterPoints',
+    'get_loading_pipeline', 'RandomDropPointsColor', 'RandomJitterPoints', 'CustomNuScenesDataset'
     'ObjectNameFilter'
 ]
