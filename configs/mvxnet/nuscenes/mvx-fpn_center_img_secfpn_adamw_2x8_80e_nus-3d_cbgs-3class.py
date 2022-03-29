@@ -1,4 +1,7 @@
-_base_ = ['../_base_/datasets/nus-3d.py','../_base_/schedules/cyclic_20e.py', '../_base_/default_runtime.py']
+_base_ = [
+    '../../_base_/datasets/nus-3d.py', '../../_base_/schedules/cyclic_20e.py',
+    '../../_base_/default_runtime.py'
+]
 
 # model settings
 voxel_size = [0.1, 0.1, 0.2]
@@ -19,9 +22,6 @@ input_modality = dict(
     use_radar=False,
     use_map=False,
     use_external=False)
-img_norm_cfg = dict(
-    mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
-
 
 db_sampler = dict(
     data_root=data_root,
@@ -59,6 +59,9 @@ db_sampler = dict(
         use_dim=[0, 1, 2, 3, 4],
         file_client_args=file_client_args))
 
+img_norm_cfg = dict(
+    mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
+
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -73,8 +76,12 @@ train_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True),
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True), #
-    dict(type='ResizeList', img_scale=(800, 450), scale_factor = 1/2, keep_ratio=True), #chgd
+    dict(type='LoadMultiViewImageFromFiles', to_float32=True),  #
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        scale_factor=1 / 2,
+        keep_ratio=True),  #chgd
     #dict(type='PhotoMetricDistortionMultiViewImage'),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(type='ObjectSample', db_sampler=db_sampler),
@@ -95,7 +102,9 @@ train_pipeline = [
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(
+        type='Collect3D',
+        keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(
@@ -112,7 +121,7 @@ test_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True), #chgd
+    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -153,7 +162,7 @@ eval_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True), #chgd
+    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -166,17 +175,19 @@ data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_train.pkl',
-        pipeline=train_pipeline,
-        classes=class_names,
-        load_interval=7,
-        modality=input_modality,
-        test_mode=False,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
+        type='CBGSDataset',
+        dataset=dict(
+            type=dataset_type,
+            data_root=data_root,
+            ann_file=data_root + 'nuscenes_infos_train.pkl',
+            pipeline=train_pipeline,
+            classes=class_names,
+            load_interval=7,
+            modality=input_modality,
+            test_mode=False,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            box_type_3d='LiDAR')),
     val=dict(
         type=dataset_type,
         data_root=data_root,
@@ -201,10 +212,8 @@ runner = dict(type='EpochBasedRunner', max_epochs=40)
 checkpoint_config = dict(interval=10)
 log_config = dict(
     interval=100,
-    hooks=[
-        dict(type='TextLoggerHook'),
-        dict(type='TensorboardLoggerHook')
-    ])
+    hooks=[dict(type='TextLoggerHook'),
+           dict(type='TensorboardLoggerHook')])
 
 # # Training settings
 # optimizer = dict(
@@ -224,12 +233,12 @@ log_config = dict(
 optimizer = dict(type='AdamW', lr=1e-4, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
-find_unused_parameters=True
+find_unused_parameters = True
 
-load_from='model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c.pth'
+load_from = 'model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c.pth'
 
 model = dict(
-    type='DynamicMVXMultiFasterRCNN',
+    type='MVXMultiFasterRCNN',
     img_backbone=dict(
         type='ResNet',
         depth=50,
@@ -244,14 +253,19 @@ model = dict(
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         num_outs=5),
+    # pts_voxel_layer=dict(
+    #     max_num_points=-1,
+    #     point_cloud_range=point_cloud_range,
+    #     voxel_size=voxel_size,
+    #     max_voxels=(-1, -1),
+    # ),
     pts_voxel_layer=dict(
-        max_num_points=-1,
-        point_cloud_range=point_cloud_range,
+        max_num_points=10,
         voxel_size=voxel_size,
-        max_voxels=(-1, -1),
-    ),
+        max_voxels=(90000, 120000),
+        point_cloud_range=point_cloud_range),
     pts_voxel_encoder=dict(
-        type='DynamicVFE',
+        type='HardVFE',
         in_channels=5,
         feat_channels=[64, 64],
         with_distance=False,
@@ -276,7 +290,11 @@ model = dict(
         in_channels=128,
         #sparse_shape=[41, 1600, 1408],
         sparse_shape=[41, 1024, 1024],
-        order=('conv', 'norm', 'act')),
+        order=('conv', 'norm', 'act'),
+        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128,
+                                                                      128)),
+        encoder_paddings=((0, 0, 1), (0, 0, 1), (0, 0, [0, 1, 1]), (0, 0)),
+        block_type='basicblock'),
     pts_backbone=dict(
         type='SECOND',
         in_channels=256,
