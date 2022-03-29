@@ -7,6 +7,7 @@ from mmdet.models import DETECTORS
 from .mvx_two_stage import MVXTwoStageDetector
 from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
 
+
 @DETECTORS.register_module()
 class MVXFasterRCNN(MVXTwoStageDetector):
     """Multi-modality VoxelNet using Faster R-CNN."""
@@ -59,16 +60,13 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
         if self.with_pts_neck:
             x = self.pts_neck(x)
         return x
-    
-    
-    
-    
+
 
 @DETECTORS.register_module()
 class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
+
     def __init__(self, **kwargs):
         super(DynamicMVXMultiFasterRCNN, self).__init__(**kwargs)
-
 
     def extract_img_feat(self, img, img_metas):
         """Extract features of images."""
@@ -121,34 +119,6 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
         losses = self.pts_bbox_head.loss(*loss_inputs)
         return losses
 
-    
-    def forward_pts_train(self,
-                          pts_feats,
-                          gt_bboxes_3d,
-                          gt_labels_3d,
-                          img_metas,
-                          gt_bboxes_ignore=None):
-        """Forward function for point cloud branch.
-
-        Args:
-            pts_feats (list[torch.Tensor]): Features of point cloud branch
-            gt_bboxes_3d (list[:obj:`BaseInstance3DBoxes`]): Ground truth
-                boxes for each sample.
-            gt_labels_3d (list[torch.Tensor]): Ground truth labels for
-                boxes of each sampole
-            img_metas (list[dict]): Meta information of samples.
-            gt_bboxes_ignore (list[torch.Tensor], optional): Ground truth
-                boxes to be ignored. Defaults to None.
-
-        Returns:
-            dict: Losses of each branch.
-        """
-        outs = self.pts_bbox_head(pts_feats)
-        loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
-        losses = self.pts_bbox_head.loss(*loss_inputs)
-        return losses
-    
-    
     def simple_test_pts(self, x, img_metas, rescale=False):
         """Test function of point cloud branch."""
         outs = self.pts_bbox_head(x)
@@ -159,7 +129,7 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
             for bboxes, scores, labels in bbox_list
         ]
         return bbox_results
-    
+
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
         points = [points[0].squeeze(0)]
@@ -178,10 +148,11 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
             for result_dict, img_bbox in zip(bbox_list, bbox_img):
                 result_dict['img_bbox'] = img_bbox
         return bbox_list
-    
+
 
 @DETECTORS.register_module()
 class MVXMultiFasterRCNN(MVXFasterRCNN):
+
     def __init__(self, **kwargs):
         super(MVXMultiFasterRCNN, self).__init__(**kwargs)
 
@@ -236,7 +207,6 @@ class MVXMultiFasterRCNN(MVXFasterRCNN):
         losses = self.pts_bbox_head.loss(*loss_inputs)
         return losses
 
-    
     def forward_pts_train(self,
                           pts_feats,
                           gt_bboxes_3d,
@@ -262,8 +232,7 @@ class MVXMultiFasterRCNN(MVXFasterRCNN):
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)
         return losses
-    
-    
+
     def simple_test_pts(self, x, img_metas, rescale=False):
         """Test function of point cloud branch."""
         outs = self.pts_bbox_head(x)
@@ -274,7 +243,7 @@ class MVXMultiFasterRCNN(MVXFasterRCNN):
             for bboxes, scores, labels in bbox_list
         ]
         return bbox_results
-    
+
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
         points = [points[0].squeeze(0)]
@@ -293,14 +262,15 @@ class MVXMultiFasterRCNN(MVXFasterRCNN):
             for result_dict, img_bbox in zip(bbox_list, bbox_img):
                 result_dict['img_bbox'] = img_bbox
         return bbox_list
-    
+
     def extract_pts_feat(self, pts, img_feats, img_metas):
         """Extract features of points."""
         if not self.with_pts_bbox:
             return None
         voxels, num_points, coors = self.voxelize(pts)
 
-        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors, img_feats, img_metas)
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors,
+                                                img_feats, img_metas)
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
@@ -308,7 +278,6 @@ class MVXMultiFasterRCNN(MVXFasterRCNN):
             x = self.pts_neck(x)
         return x
 
-    
     def aug_test_pts(self, feats, img_metas, rescale=False):
         """Test function of point cloud branch with augmentaiton.
 
