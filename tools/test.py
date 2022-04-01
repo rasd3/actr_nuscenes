@@ -41,6 +41,11 @@ def parse_args():
         help='id of gpu to use '
         '(only applicable to non-distributed testing)')
     parser.add_argument(
+        '--workers',
+        type=int,
+        default=None,
+        help='num workers for dataloader')
+    parser.add_argument(
         '--format-only',
         action='store_true',
         help='Format the output results without perform evaluation. It is'
@@ -171,6 +176,10 @@ def main():
     # set random seeds
     if args.seed is not None:
         set_random_seed(args.seed, deterministic=args.deterministic)
+    
+    # set dataloader workers
+    if args.workers is not None:
+        cfg.data.workers_per_gpu = args.workers
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)

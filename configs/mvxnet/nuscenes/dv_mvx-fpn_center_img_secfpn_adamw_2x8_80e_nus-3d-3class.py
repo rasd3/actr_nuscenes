@@ -1,4 +1,7 @@
-_base_ = ['../_base_/datasets/nus-3d.py','../_base_/schedules/cyclic_20e.py', '../_base_/default_runtime.py']
+_base_ = [
+    '../../_base_/datasets/nus-3d.py', '../../_base_/schedules/cyclic_20e.py',
+    '../../_base_/default_runtime.py'
+]
 
 # model settings
 voxel_size = [0.1, 0.1, 0.2]
@@ -21,7 +24,6 @@ input_modality = dict(
     use_external=False)
 img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
-
 
 db_sampler = dict(
     data_root=data_root,
@@ -73,8 +75,12 @@ train_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True),
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True), #
-    dict(type='ResizeList', img_scale=(800, 450), scale_factor = 1/2, keep_ratio=True), #chgd
+    dict(type='LoadMultiViewImageFromFiles', to_float32=True),  #
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        scale_factor=1 / 2,
+        keep_ratio=True),  #chgd
     #dict(type='PhotoMetricDistortionMultiViewImage'),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(type='ObjectSample', db_sampler=db_sampler),
@@ -95,7 +101,9 @@ train_pipeline = [
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(
+        type='Collect3D',
+        keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(
@@ -112,7 +120,11 @@ test_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True), #chgd
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        keep_ratio=True,
+        scale_factor=1 / 2),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -153,7 +165,11 @@ eval_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True), #chgd
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        keep_ratio=True,
+        scale_factor=1 / 2),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -201,10 +217,8 @@ runner = dict(type='EpochBasedRunner', max_epochs=40)
 checkpoint_config = dict(interval=10)
 log_config = dict(
     interval=100,
-    hooks=[
-        dict(type='TextLoggerHook'),
-        dict(type='TensorboardLoggerHook')
-    ])
+    hooks=[dict(type='TextLoggerHook'),
+           dict(type='TensorboardLoggerHook')])
 
 # # Training settings
 # optimizer = dict(
@@ -221,12 +235,12 @@ log_config = dict(
 #         momentum=0.9,
 #         weight_decay=0.0001,
 #         step_interval=1))
-optimizer = dict(type='AdamW', lr=1e-4, weight_decay=0.01)
+optimizer = dict(type='AdamW', lr=5e-5, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
-find_unused_parameters=True
+find_unused_parameters = True
 
-load_from='model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c.pth'
+load_from = 'model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c_mod.pth'
 
 model = dict(
     type='DynamicMVXMultiFasterRCNN',

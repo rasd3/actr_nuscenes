@@ -121,12 +121,16 @@ test_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True),  #chgd
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        keep_ratio=True,
+        scale_factor=0.5),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
         type='MultiScaleFlipAug3D',
-        img_scale=(1333, 800),
+        img_scale=(800, 450),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
@@ -162,7 +166,11 @@ eval_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True),
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='ResizeList', img_scale=(800, 450), keep_ratio=True),  #chgd
+    dict(
+        type='ResizeList',
+        img_scale=(800, 450),
+        keep_ratio=True,
+        scale_factor=0.5),  #chgd
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
