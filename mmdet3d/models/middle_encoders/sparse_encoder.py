@@ -1,10 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import torch
 from mmcv.runner import auto_fp16
 from torch import nn as nn
 
 from mmdet3d.ops import SparseBasicBlock, make_sparse_convmodule
 from mmdet3d.ops import spconv as spconv
 from ..builder import MIDDLE_ENCODERS
+from .. import builder
 
 
 @MIDDLE_ENCODERS.register_module()
@@ -40,7 +42,12 @@ class SparseEncoder(nn.Module):
                                                                         64)),
                  encoder_paddings=((1, ), (1, 1, 1), (1, 1, 1), ((0, 1, 1), 1,
                                                                  1)),
-                 block_type='conv_module'):
+                 block_type='conv_module',
+                 fusion_layer=None,
+                 fusion_pos=None,
+                 voxel_size=None,
+                 point_cloud_range=None,
+                 ret_img_map=False):
         super().__init__()
         assert block_type in ['conv_module', 'basicblock']
         self.sparse_shape = sparse_shape
@@ -53,6 +60,17 @@ class SparseEncoder(nn.Module):
         self.stage_num = len(self.encoder_channels)
         self.fp16_enabled = False
         # Spconv init all weight on its own
+
+        # ADD for fusion layer
+        self.fusion_layer = None
+        self.fusion_pos = None
+        self.ret_img_map = ret_img_map
+        if fusion_layer is not None:
+            self.fusion_layer = builder.build_fusion_layer(fusion_layer)
+            self.fusion_pos = fusion_pos
+            self.voxel_size = voxel_size
+            self.point_cloud_range = point_cloud_range
+        ######################
 
         assert isinstance(order, tuple) and len(order) == 3
         assert set(order) == {'conv', 'norm', 'act'}
@@ -93,8 +111,27 @@ class SparseEncoder(nn.Module):
             indice_key='spconv_down2',
             conv_type='SparseConv3d')
 
+    def coor2pts(self, x):
+        ratio = self.sparse_shape[1] / x.spatial_shape[1]
+        pts = x.indices * torch.tensor(
+            (self.voxel_size + [1])[::-1]).cuda() * ratio
+        pts[:, 0] = pts[:, 0] / ratio
+        pts[:, 1:] += torch.tensor(self.point_cloud_range[:3][::-1]).cuda()
+        pts[:, 1:] = pts[:, [3, 2, 1]]
+        pts_list = []
+        for i in range(pts[-1][0].int() + 1):
+            pts_list.append(pts[pts[:, 0] == i][:, 1:])
+        return pts_list
+
     @auto_fp16(apply_to=('voxel_features', ))
-    def forward(self, voxel_features, coors, batch_size):
+    def forward(self,
+                voxel_features,
+                coors,
+                batch_size,
+                img_feats=None,
+                img_metas=None,
+                points=None,
+                ret_lidar_features=False):
         """Forward of SparseEncoder.
 
         Args:
@@ -112,10 +149,17 @@ class SparseEncoder(nn.Module):
                                                   batch_size)
         x = self.conv_input(input_sp_tensor)
 
-        encode_features = []
-        for encoder_layer in self.encoder_layers:
+        encode_features, lidar_features = [], []
+        for idx, encoder_layer in enumerate(self.encoder_layers):
             x = encoder_layer(x)
+            if ret_lidar_features:
+                lidar_features.append(x)
             encode_features.append(x)
+            if self.fusion_pos is not None and idx in self.fusion_pos:
+                c_pts = self.coor2pts(x)
+                f_feats = self.fusion_layer(img_feats, c_pts, x.features,
+                                            img_metas)
+                x.features = f_feats
 
         # for detection head
         # [200, 176, 5] -> [200, 176, 2]
@@ -125,7 +169,10 @@ class SparseEncoder(nn.Module):
         N, C, D, H, W = spatial_features.shape
         spatial_features = spatial_features.view(N, C * D, H, W)
 
-        return spatial_features
+        if ret_lidar_features:
+            return (spatial_features, encode_features[-1], img_feats)
+        else:
+            return spatial_features, img_feats
 
     def make_encoder_layers(self,
                             make_block,

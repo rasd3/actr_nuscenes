@@ -64,6 +64,8 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
 
 @DETECTORS.register_module()
 class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
+    """Multi-modality VoxelNet using Multi image (ex. Nuscene, Waymo)
+    """
 
     def __init__(self, **kwargs):
         super(DynamicMVXMultiFasterRCNN, self).__init__(**kwargs)
@@ -93,6 +95,47 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
             img_feats_reshaped.append(img_feat.view(B, int(BN / B), C, H, W))
         return img_feats_reshaped
 
+    def extract_pts_feat(self, points, img_feats, img_metas, train):
+        """Extract point features."""
+        if not self.with_pts_bbox:
+            return None
+        if type(self.pts_voxel_encoder).__name__ == 'HardSimpleVFE':
+            voxels, num_points, coors = self.voxelize_hv(points)
+            voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
+            feature_coors = coors
+        elif type(self.pts_voxel_encoder).__name__ == 'DynamicVFE':
+            voxels, coors = self.voxelize(points)
+            voxel_features, feature_coors = self.pts_voxel_encoder(
+                voxels, coors, points, img_feats, img_metas)
+        else:
+            NotImplementedError('call wrong voxel encoder')
+
+        batch_size = coors[-1, 0] + 1
+        x, pts_aux_feats, img_feats = self.pts_middle_encoder(
+            voxel_features,
+            feature_coors,
+            batch_size,
+            img_feats,
+            img_metas,
+            points,
+            ret_lidar_features=True)
+        x = self.pts_backbone(x)
+        if self.with_pts_neck:
+            x = self.pts_neck(x)
+
+        return x, pts_aux_feats, img_feats
+
+    def extract_feat(self, points, img, img_metas, train=False):
+        """Extract features from images and points."""
+        img_feats = self.extract_img_feat(img, img_metas)
+        pts_feats, pts_aux_feats, img_feats = self.extract_pts_feat(
+            points, img_feats, img_metas, train)
+
+        if train:
+            return img_feats, pts_feats, pts_aux_feats
+        else:
+            return img_feats, pts_feats
+
     def forward_pts_train(self,
                           pts_feats,
                           gt_bboxes_3d,
@@ -117,6 +160,40 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
         outs = self.pts_bbox_head(pts_feats)
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)
+        return losses
+
+    def forward_train(self,
+                      points=None,
+                      img_metas=None,
+                      gt_bboxes_3d=None,
+                      gt_labels_3d=None,
+                      gt_labels=None,
+                      gt_bboxes=None,
+                      img=None,
+                      img_mask=None,
+                      proposals=None,
+                      gt_bboxes_ignore=None):
+        #  self.input_visualize(img, gt_bboxes)
+        #  self.input_visualize(img, gt_bboxes)
+
+        img_feats, pts_feats, pts_aux_feats = self.extract_feat(
+            points, img=img, img_metas=img_metas, train=True)
+
+        losses_pts = self.forward_pts_train(pts_feats, gt_bboxes_3d,
+                                            gt_labels_3d, img_metas,
+                                            gt_bboxes_ignore)
+        #  losses_aux = self.forward_aux_train(pts_aux_feats, img_feats,
+                                            #  gt_bboxes_3d, gt_labels_3d,
+                                            #  img_mask, img_metas)
+
+        losses = dict()
+        losses.update(losses_pts)
+        if False:
+            for key in losses_pts:
+                losses_pts[key] *= self.loss_pts_w
+                losses.update({'pts_' + key: losses_pts[key]})
+            losses.update(losses_aux)
+
         return losses
 
     def simple_test_pts(self, x, img_metas, rescale=False):
