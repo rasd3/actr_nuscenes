@@ -171,8 +171,10 @@ class SparseEncoder(nn.Module):
 
         if ret_lidar_features:
             return (spatial_features, encode_features[-1], img_feats)
-        else:
+        elif img_feats is not None:
             return spatial_features, img_feats
+        else:
+            return spatial_features
 
     def make_encoder_layers(self,
                             make_block,

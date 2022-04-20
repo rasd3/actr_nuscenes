@@ -236,7 +236,7 @@ log_config = dict(
 #         momentum=0.9,
 #         weight_decay=0.0001,
 #         step_interval=1))
-optimizer = dict(type='AdamW', lr=1e-5, weight_decay=0.01)
+optimizer = dict(type='AdamW', lr=3e-5, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
@@ -293,7 +293,7 @@ model = dict(
                 num_bins=80,
                 num_channels=[256, 256, 256, 256],
                 query_num_feat=64,
-                num_enc_layers=4,
+                num_enc_layers=2,
                 max_num_ne_voxel=26000,
                 pos_encode_method='depth'))
     ),

@@ -183,17 +183,19 @@ data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_train.pkl',
-        pipeline=train_pipeline,
-        classes=class_names,
-        load_interval=7,
-        modality=input_modality,
-        test_mode=False,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
+        type='CBGSDataset',
+        dataset=dict(
+            type=dataset_type,
+            data_root=data_root,
+            ann_file=data_root + 'nuscenes_infos_train.pkl',
+            pipeline=train_pipeline,
+            classes=class_names,
+            load_interval=7,
+            modality=input_modality,
+            test_mode=False,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            box_type_3d='LiDAR')),
     val=dict(
         type=dataset_type,
         data_root=data_root,
@@ -213,8 +215,8 @@ data = dict(
         test_mode=True,
         box_type_3d='LiDAR'))
 
-evaluation = dict(interval=20, pipeline=eval_pipeline)
-runner = dict(type='EpochBasedRunner', max_epochs=40)
+evaluation = dict(interval=10, pipeline=eval_pipeline)
+runner = dict(type='EpochBasedRunner', max_epochs=20)
 checkpoint_config = dict(interval=10)
 log_config = dict(
     interval=100,
@@ -222,22 +224,22 @@ log_config = dict(
            dict(type='TensorboardLoggerHook')])
 
 # # Training settings
-# optimizer = dict(
-#     constructor='HybridOptimizerConstructor',
-#     pts=dict(
-#         type='AdamW',
-#         lr=0.003,
-#         betas=(0.95, 0.99),
-#         weight_decay=0.01,
-#         step_interval=1),
-#     img=dict(
-#         type='SGD',
-#         lr=0.005,
-#         momentum=0.9,
-#         weight_decay=0.0001,
-#         step_interval=1))
-optimizer = dict(type='AdamW', lr=1e-5, weight_decay=0.01)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(
+   constructor='HybridOptimizerConstructor',
+   pts=dict(
+       type='AdamW',
+       lr=0.006,
+       betas=(0.95, 0.99),
+       weight_decay=0.01,
+       step_interval=1),
+   img=dict(
+       type='SGD',
+       lr=0.1,
+       momentum=0.9,
+       weight_decay=0.0001,
+       step_interval=1))
+#  optimizer = dict(type='AdamW', lr=3e-5, weight_decay=0.01)
+#  optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
 
@@ -293,7 +295,7 @@ model = dict(
                 num_bins=80,
                 num_channels=[256, 256, 256, 256],
                 query_num_feat=64,
-                num_enc_layers=4,
+                num_enc_layers=2,
                 max_num_ne_voxel=26000,
                 pos_encode_method='depth'))
     ),

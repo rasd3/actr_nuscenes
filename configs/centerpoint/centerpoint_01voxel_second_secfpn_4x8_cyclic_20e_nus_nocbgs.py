@@ -154,19 +154,17 @@ eval_pipeline = [
 data = dict(
     samples_per_gpu=8,
     train=dict(
-        type='CBGSDataset',
-        dataset=dict(
-            type=dataset_type,
-            data_root=data_root,
-            ann_file=data_root + 'nuscenes_infos_train.pkl',
-            pipeline=train_pipeline,
-            load_interval=7,
-            classes=class_names,
-            test_mode=False,
-            use_valid_flag=True,
-            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR')),
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'nuscenes_infos_train.pkl',
+        pipeline=train_pipeline,
+        load_interval=7,
+        classes=class_names,
+        test_mode=False,
+        use_valid_flag=True,
+        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+        box_type_3d='LiDAR'),
     val=dict(pipeline=test_pipeline, classes=class_names),
     test=dict(pipeline=test_pipeline, classes=class_names))
 
