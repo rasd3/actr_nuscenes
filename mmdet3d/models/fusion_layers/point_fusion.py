@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
-import time
 import numpy as np
 from mmcv.cnn import ConvModule
 from mmcv.runner import BaseModule
@@ -16,7 +15,6 @@ from . import apply_3d_transformation
 from nuscenes.utils.geometry_utils import view_points
 from nuscenes.nuscenes import NuScenes
 from pyquaternion import Quaternion
-
 
 def point_sample(img_meta,
                  img_features,
@@ -394,6 +392,7 @@ def projection(points, nusc, img_meta, idx, img_features=None):
     if False:
         import cv2
         image = cv2.imread(img_meta['filename'][idx], cv2.COLOR_BGR2RGB)
+        global IDX
         for i in pts_2d:
             x = i[0].item()
             y = i[1].item()
@@ -402,7 +401,8 @@ def projection(points, nusc, img_meta, idx, img_features=None):
                 radius=1,
                 color=(0, 0, 255),
                 thickness=-1)
-        cv2.imwrite(f"demo2.jpg", image)
+        cv2.imwrite("demo_%d_%d_%d.png" % (IDX // 18, IDX % 6, IDX // 6), image)
+        IDX += 1
 
     return pts_2d, point_idx
 

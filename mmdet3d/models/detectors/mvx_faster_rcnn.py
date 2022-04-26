@@ -178,6 +178,11 @@ class DynamicMVXMultiFasterRCNN(DynamicMVXFasterRCNN):
 
         img_feats, pts_feats, pts_aux_feats = self.extract_feat(
             points, img=img, img_metas=img_metas, train=True)
+        if False:
+            from mmdet3d.utils.simplevis import nuscene_vis
+            import cv2
+            bev = nuscene_vis(c_pts[0].cpu().numpy(),  gt_bboxes_3d[0].tensor.numpy())
+            cv2.imwrite('demo_bev.png', bev)
 
         losses_pts = self.forward_pts_train(pts_feats, gt_bboxes_3d,
                                             gt_labels_3d, img_metas,
