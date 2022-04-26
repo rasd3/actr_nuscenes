@@ -125,6 +125,7 @@ nuscenes_gt_database_img/
 fcos_image/
 gt_database_img/
 gtc_nuimage/
+train.sh
 
 
 # Pytorch
