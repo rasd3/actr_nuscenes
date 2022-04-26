@@ -111,11 +111,11 @@ class SparseEncoder(nn.Module):
             indice_key='spconv_down2',
             conv_type='SparseConv3d')
 
-    def coor2pts(self, x):
+    def coor2pts(self, x, pad=0.0):
         ratio = self.sparse_shape[1] / x.spatial_shape[1]
-        pts = x.indices * torch.tensor(
+        pts = (x.indices.to(torch.float) + pad) * torch.tensor(
             (self.voxel_size + [1])[::-1]).cuda() * ratio
-        pts[:, 0] = pts[:, 0] / ratio
+        pts[:, 0] = pts[:, 0] / ratio - pad
         pts[:, 1:] += torch.tensor(self.point_cloud_range[:3][::-1]).cuda()
         pts[:, 1:] = pts[:, [3, 2, 1]]
         pts_list = []
@@ -156,7 +156,7 @@ class SparseEncoder(nn.Module):
                 lidar_features.append(x)
             encode_features.append(x)
             if self.fusion_pos is not None and idx in self.fusion_pos:
-                c_pts = self.coor2pts(x)
+                c_pts = self.coor2pts(x, 0.5)
                 f_feats = self.fusion_layer(img_feats, c_pts, x.features,
                                             img_metas)
                 x.features = f_feats
