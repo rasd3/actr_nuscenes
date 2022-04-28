@@ -221,7 +221,7 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
 
-load_from = './model_zoo/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_20201001_135205-5db91e00_union.pth'
+load_from = 'model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c_mod.pth'
 
 model = dict(
     type='DynamicMVXMultiFasterRCNN',
