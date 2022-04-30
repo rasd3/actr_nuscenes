@@ -216,7 +216,7 @@ log_config = dict(
 #         momentum=0.9,
 #         weight_decay=0.0001,
 #         step_interval=1))
-optimizer = dict(type='AdamW', lr=3e-6, weight_decay=0.01)
+optimizer = dict(type='AdamW', lr=6e-6, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True

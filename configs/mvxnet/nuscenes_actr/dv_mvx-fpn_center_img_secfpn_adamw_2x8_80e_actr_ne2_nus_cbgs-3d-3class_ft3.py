@@ -202,21 +202,21 @@ log_config = dict(
            dict(type='TensorboardLoggerHook')])
 
 # # Training settings
-# optimizer = dict(
-#     constructor='HybridOptimizerConstructor',
-#     pts=dict(
-#         type='AdamW',
-#         lr=0.003,
-#         betas=(0.95, 0.99),
-#         weight_decay=0.01,
-#         step_interval=1),
-#     img=dict(
-#         type='SGD',
-#         lr=0.005,
-#         momentum=0.9,
-#         weight_decay=0.0001,
-#         step_interval=1))
-optimizer = dict(type='AdamW', lr=3e-6, weight_decay=0.01)
+optimizer = dict(
+   constructor='HybridOptimizerConstructor',
+   pts=dict(
+       type='AdamW',
+       lr=3e-6,
+       betas=(0.95, 0.99),
+       weight_decay=0.01,
+       step_interval=1),
+   img=dict(
+       type='SGD',
+       lr=0.0024,
+       momentum=0.9,
+       weight_decay=0.0001,
+       step_interval=1))
+#  optimizer = dict(type='AdamW', lr=3e-6, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
