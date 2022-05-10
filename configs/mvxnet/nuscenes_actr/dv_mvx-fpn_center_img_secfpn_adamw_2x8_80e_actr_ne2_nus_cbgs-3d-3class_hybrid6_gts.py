@@ -13,8 +13,8 @@ class_names = [
 
 # dataset settings
 dataset_type = 'CustomNuScenesDataset'
-data_type = 'v1.0-trainval'
 data_root = 'data/nuscenes/'
+data_version = 'v1.0-trainval'
 file_client_args = dict(backend='disk')
 
 input_modality = dict(
@@ -183,19 +183,21 @@ data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_train.pkl',
-        pipeline=train_pipeline,
-        classes=class_names,
-        load_interval=7,
-        modality=input_modality,
-        test_mode=False,
-        with_nusc=True,
-        data_type=data_type,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
+        type='CBGSDataset',
+        dataset=dict(
+            type=dataset_type,
+            data_root=data_root,
+            ann_file=data_root + 'nuscenes_infos_train.pkl',
+            pipeline=train_pipeline,
+            classes=class_names,
+            load_interval=7,
+            modality=input_modality,
+            test_mode=False,
+            with_nusc=True,
+            data_type=data_version,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            box_type_3d='LiDAR')),
     val=dict(
         type=dataset_type,
         data_root=data_root,
@@ -215,8 +217,8 @@ data = dict(
         test_mode=True,
         box_type_3d='LiDAR'))
 
-evaluation = dict(interval=20, pipeline=eval_pipeline)
-runner = dict(type='EpochBasedRunner', max_epochs=40)
+evaluation = dict(interval=10, pipeline=eval_pipeline)
+runner = dict(type='EpochBasedRunner', max_epochs=20)
 checkpoint_config = dict(interval=10)
 log_config = dict(
     interval=100,
@@ -224,22 +226,23 @@ log_config = dict(
            dict(type='TensorboardLoggerHook')])
 
 # # Training settings
-# optimizer = dict(
-#     constructor='HybridOptimizerConstructor',
-#     pts=dict(
-#         type='AdamW',
-#         lr=0.003,
-#         betas=(0.95, 0.99),
-#         weight_decay=0.01,
-#         step_interval=1),
-#     img=dict(
-#         type='SGD',
-#         lr=0.005,
-#         momentum=0.9,
-#         weight_decay=0.0001,
-#         step_interval=1))
-optimizer = dict(type='AdamW', lr=5e-5, weight_decay=0.01)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(
+    _delete_=True,
+    constructor='HybridOptimizerConstructor',
+    pts=dict(
+        type='AdamW',
+        lr=0.001,
+        betas=(0.95, 0.99),
+        weight_decay=0.01,
+        step_interval=1),
+    img=dict(
+        type='SGD',
+        lr=0.0024,
+        momentum=0.9,
+        weight_decay=0.0001,
+        step_interval=1))
+#  optimizer = dict(type='AdamW', lr=3e-5, weight_decay=0.01)
+#  optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
 
@@ -276,24 +279,29 @@ model = dict(
         with_cluster_center=True,
         with_voxel_center=True,
         point_cloud_range=point_cloud_range,
-        fusion_layer=dict(
-            type='PointMultiFusion',
-            img_channels=256,
-            pts_channels=64,
-            mid_channels=128,
-            out_channels=128,
-            img_levels=[0, 1, 2, 3, 4],
-            data_type='v1.0-trainval',
-            align_corners=False,
-            activate_out=True,
-            fuse_out=False)),
-    #),
+    ),
     pts_middle_encoder=dict(
         type='SparseEncoder',
         in_channels=128,
         #sparse_shape=[41, 1600, 1408],
         sparse_shape=[41, 1024, 1024],
-        order=('conv', 'norm', 'act')),
+        order=('conv', 'norm', 'act'),
+        fusion_pos=[3],
+        voxel_size=voxel_size,
+        point_cloud_range=point_cloud_range,
+        fusion_layer=dict(
+            type='ACTR',
+            data_root=data_root,
+            data_version=data_version,
+            actr_cfg=dict(
+                fusion_method='sum',
+                num_bins=80,
+                num_channels=[256, 256, 256, 256],
+                query_num_feat=64,
+                num_enc_layers=2,
+                max_num_ne_voxel=26000,
+                pos_encode_method='depth'))
+    ),
     pts_backbone=dict(
         type='SECOND',
         in_channels=256,

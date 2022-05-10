@@ -207,22 +207,22 @@ optimizer = dict(
     constructor='HybridOptimizerConstructor',
     pts=dict(
         type='AdamW',
-        lr=3e-6,
+        lr=0.001,
         betas=(0.95, 0.99),
         weight_decay=0.01,
         step_interval=1),
     img=dict(
         type='SGD',
-        lr=0.0024,
+        lr=0.00024,
         momentum=0.9,
         weight_decay=0.0001,
         step_interval=1))
-#  optimizer = dict(type='AdamW', lr=3e-6, weight_decay=0.01)
+optimizer = dict(type='AdamW', lr=3e-5, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # You may need to download the model first is the network is unstable
 find_unused_parameters = True
 
-load_from = './model_zoo/centerpoint_interval7_2x4_union.pth'
+load_from = 'model_zoo/htc_r50_fpn_coco-20e_20e_nuim_20201008_211415-d6c60a2c_mod.pth'
 
 model = dict(
     type='DynamicMVXMultiFasterRCNN',

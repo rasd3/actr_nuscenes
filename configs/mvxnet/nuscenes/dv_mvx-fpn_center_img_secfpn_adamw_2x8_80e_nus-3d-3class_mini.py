@@ -13,8 +13,8 @@ class_names = [
 
 # dataset settings
 dataset_type = 'CustomNuScenesDataset'
-data_type = 'v1.0-trainval'
-data_root = 'data/nuscenes/'
+data_type = 'v1.0-mini'
+data_root = 'data/nuscenes-mini/'
 file_client_args = dict(backend='disk')
 
 input_modality = dict(
@@ -283,9 +283,10 @@ model = dict(
             mid_channels=128,
             out_channels=128,
             img_levels=[0, 1, 2, 3, 4],
-            data_type='v1.0-trainval',
+            data_type=data_type,
             align_corners=False,
             activate_out=True,
+            data_root=data_root,
             fuse_out=False)),
     #),
     pts_middle_encoder=dict(

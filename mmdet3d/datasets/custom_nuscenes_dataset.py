@@ -73,4 +73,7 @@ class CustomNuScenesDataset(NuScenesDataset):
             annos = self.get_ann_info(index)
             input_dict['ann_info'] = annos
 
+        if self.with_nusc:
+            input_dict['nusc'] = self.nusc
+                
         return input_dict

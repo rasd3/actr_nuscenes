@@ -1,5 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
+import torch
+import cv2
 import warnings
 from mmcv import is_tuple_of
 from mmcv.utils import build_from_cfg
@@ -8,6 +10,7 @@ import random
 from mmdet3d.core import VoxelGenerator
 from mmdet3d.core.bbox import (CameraInstance3DBoxes, DepthInstance3DBoxes,
                                LiDARInstance3DBoxes, box_np_ops)
+from mmdet3d.models.fusion_layers.point_fusion import get_2d_coor_multi, projection
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import RandomFlip, Resize
 from ..builder import OBJECTSAMPLERS
@@ -289,9 +292,95 @@ class ObjectSample(object):
         points = points[np.logical_not(masks.any(-1))]
         return points
 
-    def __call__(self, input_dict):
-        """Call function to sample ground truth objects to the data.
+    def sample_img(self, input_dict, gt_tokens, gt_bboxes, num_ori, gt_labels):
+        """ 1. get crop img based gt_bboxes_3d and each tokens
+            2. sort crop img based on depth
+            3. reproject gt_bboxes_3d at target image with target calib
+            4. resize crop img based projected on target image
+            5. paste crop img in order
+        """
+        nusc = input_dict['nusc']
+        scale_factor = input_dict['scale_factor'][0]
+        cam_list = [
+            'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_FRONT_LEFT', 'CAM_BACK',
+            'CAM_BACK_LEFT', 'CAM_BACK_RIGHT'
+        ]
+        CLASSES = ('car', 'truck', 'trailer', 'bus', 'construction_vehicle',
+                   'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
+                   'barrier')
+        # 1
+        gt_bboxes = gt_bboxes.tensor.numpy()
+        bbox_corners = box_np_ops.center_to_corner_box3d(
+            gt_bboxes[:, :3],
+            gt_bboxes[:, 3:6],
+            gt_bboxes[:, 6],
+            origin=(0.5, 0.5, 0),
+            axis=2)
+        img_crop = [{} for _ in range(gt_bboxes.shape[0])]
+        for idx in range(len(gt_tokens)):
+            img_meta = {'sample_idx': gt_tokens[idx]}
+            samp_data = nusc.get('sample', gt_tokens[idx])
+            filenames = [
+                nusc.get('sample_data', samp_data['data'][c_n])['filename']
+                for c_n in cam_list
+            ]
+            for c_i, c_name in enumerate(cam_list):
+                img_crop[idx][c_name] = []
+                cam_data = nusc.get('sample_data', samp_data['data'][c_name])
+                img_meta['filename'] = filenames
+                img_meta['ori_shape'] = input_dict['ori_shape'][:2]
+                pts_2d, point_idx = projection(
+                    torch.tensor(bbox_corners[idx]), nusc, img_meta, c_i)
+                if len(point_idx) == 0:
+                    continue
+                p_min, p_max = pts_2d.min(0)[0].to(
+                    torch.int), pts_2d.max(0)[0].to(torch.int)
+                if (p_max[1] - p_min[1]) < 10 or (p_max[0] - p_min[0]) < 10:
+                    continue
+                img = mmcv.imread(nusc.dataroot + filenames[c_i], 'unchanged')
+                img_crop[idx][c_name] = img[p_min[1]:p_max[1],
+                                            p_min[0]:p_max[0]]
+                if False:
+                    cv2.imwrite(
+                        '%s_%d_%d.png' % (CLASSES[gt_labels[idx]], c_i, idx),
+                        img_crop[idx][c_name])
+        # 2
+        depth = np.power(gt_bboxes[:, :2], 2).sum(1)
+        d_ord = np.argsort(depth)
 
+        # 3, 4, 5
+        for c_i, c_name in enumerate(cam_list):
+            img_meta = {
+                'sample_idx': gt_tokens[0],
+                'filename': input_dict['img_filename'],
+                'ori_shape': input_dict['ori_shape'][:2]
+            }
+            for idx in d_ord:
+                if len(img_crop[idx][c_name]) == 0:
+                    continue
+                pts_2d, point_idx = projection(
+                    torch.tensor(bbox_corners[idx]), nusc, img_meta, c_i)
+                if len(point_idx) == 0:
+                    continue
+                p_min, p_max = pts_2d.min(0)[0].to(
+                    torch.int), pts_2d.max(0)[0].to(torch.int)
+                p_min, p_max = (p_min * scale_factor).to(
+                    torch.int), (p_max * scale_factor).to(torch.int)
+                if (p_max[1] - p_min[1]) < 10 or (p_max[0] - p_min[0]) < 10:
+                    continue
+                img_crop_res = cv2.resize(img_crop[idx][c_name],
+                                          tuple((p_max - p_min).numpy()))
+                input_dict['img'][c_i][p_min[1]:p_max[1],
+                                       p_min[0]:p_max[0]] = img_crop_res
+
+        if False:
+            for i in range(6):
+                cv2.imwrite('test1_%d.png' % i, input_dict['img'][i])
+            breakpoint()
+        return input_dict
+
+    def __call__(self, input_dict):
+        """
         Args:
             input_dict (dict): Result dict from loading pipeline.
 
@@ -306,13 +395,13 @@ class ObjectSample(object):
         # change to float for blending operation
         points = input_dict['points']
         if self.sample_2d:
-            img = input_dict['img']
-            gt_bboxes_2d = input_dict['gt_bboxes']
+            #  gt_bboxes_2d = input_dict['gt_bboxes']
             # Assume for now 3D & 2D bboxes are the same
+            img = input_dict['img']
             sampled_dict = self.db_sampler.sample_all(
                 gt_bboxes_3d.tensor.numpy(),
                 gt_labels_3d,
-                gt_bboxes_2d=gt_bboxes_2d,
+                #  gt_bboxes_2d=gt_bboxes_2d,
                 img=img)
         else:
             sampled_dict = self.db_sampler.sample_all(
@@ -323,6 +412,10 @@ class ObjectSample(object):
             sampled_points = sampled_dict['points']
             sampled_gt_labels = sampled_dict['gt_labels_3d']
 
+            ori_tokens = [
+                input_dict['sample_idx']
+                for _ in range(gt_bboxes_3d.tensor.shape[0])
+            ]
             gt_labels_3d = np.concatenate([gt_labels_3d, sampled_gt_labels],
                                           axis=0)
             gt_bboxes_3d = gt_bboxes_3d.new_box(
@@ -334,12 +427,18 @@ class ObjectSample(object):
             points = points.cat([sampled_points, points])
 
             if self.sample_2d:
-                sampled_gt_bboxes_2d = sampled_dict['gt_bboxes_2d']
-                gt_bboxes_2d = np.concatenate(
-                    [gt_bboxes_2d, sampled_gt_bboxes_2d]).astype(np.float32)
+                if False:
+                    sampled_gt_bboxes_2d = sampled_dict['gt_bboxes_2d']
+                    gt_bboxes_2d = np.concatenate(
+                        [gt_bboxes_2d,
+                         sampled_gt_bboxes_2d]).astype(np.float32)
+                    input_dict['gt_bboxes'] = gt_bboxes_2d
+                    input_dict['img'] = sampled_dict['img']
 
-                input_dict['gt_bboxes'] = gt_bboxes_2d
-                input_dict['img'] = sampled_dict['img']
+                gt_tokens = ori_tokens + sampled_dict['gt_tokens']
+                input_dict = self.sample_img(input_dict,
+                                             gt_tokens, gt_bboxes_3d,
+                                             len(ori_tokens), gt_labels_3d)
 
         input_dict['gt_bboxes_3d'] = gt_bboxes_3d
         input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.long)
@@ -1449,11 +1548,16 @@ class PadMultiViewImage(object):
     def _pad_img(self, results):
         """Pad images according to ``self.size``."""
         if self.size is not None:
-            padded_img = [mmcv.impad(
-                img, shape=self.size, pad_val=self.pad_val) for img in results['img']]
+            padded_img = [
+                mmcv.impad(img, shape=self.size, pad_val=self.pad_val)
+                for img in results['img']
+            ]
         elif self.size_divisor is not None:
-            padded_img = [mmcv.impad_to_multiple(
-                img, self.size_divisor, pad_val=self.pad_val) for img in results['img']]
+            padded_img = [
+                mmcv.impad_to_multiple(
+                    img, self.size_divisor, pad_val=self.pad_val)
+                for img in results['img']
+            ]
         results['img'] = padded_img
         results['img_shape'] = [img.shape for img in padded_img]
         results['pad_shape'] = [img.shape for img in padded_img]
@@ -1502,8 +1606,10 @@ class NormalizeMultiviewImage(object):
             dict: Normalized results, 'img_norm_cfg' key is added into
                 result dict.
         """
-        results['img'] = [mmcv.imnormalize(
-            img, self.mean, self.std, self.to_rgb) for img in results['img']]
+        results['img'] = [
+            mmcv.imnormalize(img, self.mean, self.std, self.to_rgb)
+            for img in results['img']
+        ]
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
         return results
@@ -1560,7 +1666,7 @@ class PhotoMetricDistortionMultiViewImage:
             # random brightness
             if random.randint(2):
                 delta = random.uniform(-self.brightness_delta,
-                                    self.brightness_delta)
+                                       self.brightness_delta)
                 img += delta
 
             # mode == 0 --> do random contrast first
@@ -1569,7 +1675,7 @@ class PhotoMetricDistortionMultiViewImage:
             if mode == 1:
                 if random.randint(2):
                     alpha = random.uniform(self.contrast_lower,
-                                        self.contrast_upper)
+                                           self.contrast_upper)
                     img *= alpha
 
             # convert color from BGR to HSV
@@ -1578,7 +1684,7 @@ class PhotoMetricDistortionMultiViewImage:
             # random saturation
             if random.randint(2):
                 img[..., 1] *= random.uniform(self.saturation_lower,
-                                            self.saturation_upper)
+                                              self.saturation_upper)
 
             # random hue
             if random.randint(2):
@@ -1593,7 +1699,7 @@ class PhotoMetricDistortionMultiViewImage:
             if mode == 0:
                 if random.randint(2):
                     alpha = random.uniform(self.contrast_lower,
-                                        self.contrast_upper)
+                                           self.contrast_upper)
                     img *= alpha
 
             # randomly swap channels
@@ -1631,7 +1737,9 @@ class CropMultiViewImage(object):
         Returns:
             dict: Updated result dict.
         """
-        results['img'] = [img[:self.size[0], :self.size[1], ...] for img in results['img']]
+        results['img'] = [
+            img[:self.size[0], :self.size[1], ...] for img in results['img']
+        ]
         results['img_shape'] = [img.shape for img in results['img']]
         results['img_fixed_size'] = self.size
         return results
@@ -1663,11 +1771,14 @@ class RandomScaleImageMultiViewImage(object):
         rand_scale = self.scales[0]
         img_shape = results['img_shape'][0]
         y_size = int(img_shape[0] * rand_scale)
-        x_size = int(img_shape[1] * rand_scale) 
+        x_size = int(img_shape[1] * rand_scale)
         scale_factor = np.eye(4)
         scale_factor[0, 0] *= rand_scale
         scale_factor[1, 1] *= rand_scale
-        results['img'] = [mmcv.imresize(img, (x_size, y_size), return_scale=False) for img in results['img']]
+        results['img'] = [
+            mmcv.imresize(img, (x_size, y_size), return_scale=False)
+            for img in results['img']
+        ]
         lidar2img = [scale_factor @ l2i for l2i in results['lidar2img']]
         results['lidar2img'] = lidar2img
         results['img_shape'] = [img.shape for img in results['img']]
@@ -1695,7 +1806,9 @@ class HorizontalRandomFlipMultiViewImage(object):
         return results
 
     def flip_img(self, results, direction='horizontal'):
-        results['img'] = [mmcv.imflip(img, direction) for img in results['img']]
+        results['img'] = [
+            mmcv.imflip(img, direction) for img in results['img']
+        ]
         return results
 
     def flip_cam_params(self, results):
@@ -1726,7 +1839,7 @@ class HorizontalRandomFlipMultiViewImage(object):
                 input_dict[key].flip(direction)
         return input_dict
 
-    
+
 @PIPELINES.register_module()
 class ResizeList(Resize):
     """[Resize with List]
@@ -1734,23 +1847,26 @@ class ResizeList(Resize):
     Args:
         Please refer to Resize
     """
+
     def __init__(self,
                  img_scale=None,
-                 scale_factor = None,
+                 scale_factor=None,
                  multiscale_mode='range',
                  ratio_range=None,
                  keep_ratio=True,
                  bbox_clip_border=True,
                  backend='cv2',
                  override=False):
-        super().__init__(img_scale = img_scale,
-                       multiscale_mode = multiscale_mode,
-                       ratio_range = ratio_range,
-                       keep_ratio = keep_ratio,
-                       bbox_clip_border = bbox_clip_border,
-                       backend = backend,
-                       override = override)
+        super().__init__(
+            img_scale=img_scale,
+            multiscale_mode=multiscale_mode,
+            ratio_range=ratio_range,
+            keep_ratio=keep_ratio,
+            bbox_clip_border=bbox_clip_border,
+            backend=backend,
+            override=override)
         self.scale_factor = scale_factor
+
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
         for img_idx in range(len(results['img'])):
@@ -1781,6 +1897,7 @@ class ResizeList(Resize):
         results['pad_shape'] = img.shape
         results['scale_factor'] = scale_factor
         results['keep_ratio'] = self.keep_ratio
+
     def __call__(self, results):
         """Call function to resize images, bounding boxes, masks, semantic
         segmentation map.

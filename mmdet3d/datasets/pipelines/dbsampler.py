@@ -274,6 +274,9 @@ class DataBaseSampler(object):
                 np.arange(gt_bboxes.shape[0],
                           gt_bboxes.shape[0] + len(sampled))
             }
+            if img is not None:
+                gt_tokens = [a['image_idx'] for a in sampled]
+                ret['gt_tokens'] = gt_tokens
 
         return ret
 

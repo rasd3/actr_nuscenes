@@ -5,6 +5,7 @@ import pyquaternion
 import tempfile
 from nuscenes.utils.data_classes import Box as NuScenesBox
 from os import path as osp
+from nuscenes import NuScenes
 
 from mmdet.datasets import DATASETS
 from ..core import show_result
@@ -123,7 +124,10 @@ class NuScenesDataset(Custom3DDataset):
                  filter_empty_gt=True,
                  test_mode=False,
                  eval_version='detection_cvpr_2019',
-                 use_valid_flag=False):
+                 use_valid_flag=False,
+                 with_nusc=False,
+                 data_type=None,
+                 ):
         self.load_interval = load_interval
         self.use_valid_flag = use_valid_flag
         super().__init__(
@@ -149,6 +153,11 @@ class NuScenesDataset(Custom3DDataset):
                 use_external=False,
             )
         self.PALETTE = None
+        # add
+        self.with_nusc = with_nusc
+        if with_nusc:
+            assert data_type is not None
+            self.nusc = NuScenes(version=data_type, dataroot=data_root)
 
     def get_cat_ids(self, idx):
         """Get category distribution of single scene.
@@ -245,6 +254,9 @@ class NuScenesDataset(Custom3DDataset):
         if not self.test_mode:
             annos = self.get_ann_info(index)
             input_dict['ann_info'] = annos
+
+        if self.with_nusc:
+            input_dict['nusc'] = self.nusc
 
         return input_dict
 
@@ -384,7 +396,6 @@ class NuScenesDataset(Custom3DDataset):
         Returns:
             dict: Dictionary of evaluation details.
         """
-        from nuscenes import NuScenes
         from nuscenes.eval.detection.evaluate import NuScenesEval
 
         output_dir = osp.join(*osp.split(result_path)[:-1])

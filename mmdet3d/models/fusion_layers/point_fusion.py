@@ -311,7 +311,7 @@ class PointFusion(BaseModule):
         return img_pts
 
 
-def projection(points, nusc, img_meta, idx, img_features=None):
+def projection(points, nusc, img_meta, idx, img_features=None, data_root=None):
 
     def translate(points, x):
         """
@@ -389,9 +389,9 @@ def projection(points, nusc, img_meta, idx, img_features=None):
     point_idx = (mask != 0).nonzero()[0]
 
     # visualize
-    if False:
+    if False: #len(pts_2d):
         import cv2
-        image = cv2.imread(img_meta['filename'][idx], cv2.COLOR_BGR2RGB)
+        image = cv2.imread(data_root + '/' + img_meta['filename'][idx], cv2.COLOR_BGR2RGB)
         global IDX
         for i in pts_2d:
             x = i[0].item()
@@ -401,8 +401,7 @@ def projection(points, nusc, img_meta, idx, img_features=None):
                 radius=1,
                 color=(0, 0, 255),
                 thickness=-1)
-        cv2.imwrite("demo_%d_%d_%d.png" % (IDX // 18, IDX % 6, IDX // 6), image)
-        IDX += 1
+        cv2.imwrite("test.png", image)
 
     return pts_2d, point_idx
 
@@ -555,7 +554,9 @@ class PointMultiFusion(PointFusion):
                  aligned=True,
                  align_corners=True,
                  padding_mode='zeros',
-                 lateral_conv=True):
+                 lateral_conv=True,
+                 data_root='data/nuscenes'
+                 ):
         super(PointMultiFusion, self).__init__(
             img_channels,
             pts_channels=pts_channels,
@@ -578,7 +579,7 @@ class PointMultiFusion(PointFusion):
         self.data_type = data_type
 
         self.nusc = NuScenes(
-            version=self.data_type, dataroot='./data/nuscenes', verbose=True)
+            version=self.data_type, dataroot=data_root, verbose=True)
 
     def obtain_mlvl_feats(self, img_feats, pts, img_metas):
         """Obtain multi-level features for each point.
