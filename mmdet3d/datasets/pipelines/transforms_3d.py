@@ -292,22 +292,25 @@ class ObjectSample(object):
         points = points[np.logical_not(masks.any(-1))]
         return points
 
-    def sample_img(self, input_dict, gt_tokens, gt_bboxes, num_ori, gt_labels):
+    def sample_img(self, input_dict, gt_tokens, gt_bboxes, num_ori, gt_labels,
+                   sampled_dict):
         """ 1. get crop img based gt_bboxes_3d and each tokens
             2. sort crop img based on depth
             3. reproject gt_bboxes_3d at target image with target calib
             4. resize crop img based projected on target image
             5. paste crop img in order
         """
+        # prepare
         nusc = input_dict['nusc']
-        scale_factor = input_dict['scale_factor'][0]
         cam_list = [
             'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_FRONT_LEFT', 'CAM_BACK',
             'CAM_BACK_LEFT', 'CAM_BACK_RIGHT'
         ]
-        CLASSES = ('car', 'truck', 'trailer', 'bus', 'construction_vehicle',
-                   'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
-                   'barrier')
+        CLASSES = [
+            'car', 'truck', 'construction_vehicls', 'bus', 'trailer',
+            'barrier', 'motorcycls', 'bicycle', 'pedestrian', 'traffic_cone'
+        ]
+        crop_mode = 'load'
         # 1
         gt_bboxes = gt_bboxes.tensor.numpy()
         bbox_corners = box_np_ops.center_to_corner_box3d(
@@ -329,20 +332,38 @@ class ObjectSample(object):
                 cam_data = nusc.get('sample_data', samp_data['data'][c_name])
                 img_meta['filename'] = filenames
                 img_meta['ori_shape'] = input_dict['ori_shape'][:2]
-                pts_2d, point_idx = projection(
-                    torch.tensor(bbox_corners[idx]), nusc, img_meta, c_i)
+                points_cp = torch.tensor(bbox_corners[idx]).clone()
+                if idx > num_ori:
+                    points_cp = torch.cat([
+                        points_cp,
+                        sampled_dict['points_list'][idx -
+                                                    num_ori].tensor[:, :3]
+                    ])
+                pts_2d, point_idx = projection(points_cp, nusc, img_meta, c_i)
                 if len(point_idx) == 0:
                     continue
                 p_min, p_max = pts_2d.min(0)[0].to(
                     torch.int), pts_2d.max(0)[0].to(torch.int)
                 if (p_max[1] - p_min[1]) < 10 or (p_max[0] - p_min[0]) < 10:
                     continue
-                img = mmcv.imread(nusc.dataroot + filenames[c_i], 'unchanged')
-                img_crop[idx][c_name] = img[p_min[1]:p_max[1],
-                                            p_min[0]:p_max[0]]
+
+                if crop_mode == 'crop':
+                    img = mmcv.imread(nusc.dataroot + filenames[c_i],
+                                      'unchanged')
+                    img_crop[idx][c_name] = img[p_min[1]:p_max[1],
+                                                p_min[0]:p_max[0]]
+                elif crop_mode == 'load':
+                    if idx < num_ori:
+                        img_crop[idx][c_name] = input_dict['img'][c_i][
+                            p_min[1]:p_max[1], p_min[0]:p_max[0]]
+                    else:
+                        img_crop[idx][c_name] = mmcv.imread(
+                            sampled_dict['patch_paths'][idx - num_ori][c_i])
+
                 if False:
                     cv2.imwrite(
-                        '%s_%d_%d.png' % (CLASSES[gt_labels[idx]], c_i, idx),
+                        'vis_2/%s_%d_%d.png' %
+                        (CLASSES[gt_labels[idx]], c_i, idx),
                         img_crop[idx][c_name])
         # 2
         depth = np.power(gt_bboxes[:, :2], 2).sum(1)
@@ -358,14 +379,18 @@ class ObjectSample(object):
             for idx in d_ord:
                 if len(img_crop[idx][c_name]) == 0:
                     continue
-                pts_2d, point_idx = projection(
-                    torch.tensor(bbox_corners[idx]), nusc, img_meta, c_i)
+                points_cp = torch.tensor(bbox_corners[idx]).clone()
+                if idx > num_ori:
+                    points_cp = torch.cat([
+                        points_cp,
+                        sampled_dict['points_list'][idx -
+                                                    num_ori].tensor[:, :3]
+                    ])
+                pts_2d, point_idx = projection(points_cp, nusc, img_meta, c_i)
                 if len(point_idx) == 0:
                     continue
                 p_min, p_max = pts_2d.min(0)[0].to(
                     torch.int), pts_2d.max(0)[0].to(torch.int)
-                p_min, p_max = (p_min * scale_factor).to(
-                    torch.int), (p_max * scale_factor).to(torch.int)
                 if (p_max[1] - p_min[1]) < 10 or (p_max[0] - p_min[0]) < 10:
                     continue
                 img_crop_res = cv2.resize(img_crop[idx][c_name],
@@ -438,7 +463,8 @@ class ObjectSample(object):
                 gt_tokens = ori_tokens + sampled_dict['gt_tokens']
                 input_dict = self.sample_img(input_dict,
                                              gt_tokens, gt_bboxes_3d,
-                                             len(ori_tokens), gt_labels_3d)
+                                             len(ori_tokens), gt_labels_3d,
+                                             sampled_dict)
 
         input_dict['gt_bboxes_3d'] = gt_bboxes_3d
         input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.long)

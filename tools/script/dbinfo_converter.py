@@ -86,9 +86,16 @@ def img(pkl_path, data_root, data_version):
                     data_root, db['image_idx'], info_cls, db['gt_idx'], c_name)
                 cv2.imwrite(img_path, img_crop)
                 img_list[c_i] = img_path
-            info[info_cls][idx] = img_list
-    pkl.dump(info, open('nuscenes_imgdbinfos_train.pkl', 'wb'))
+            info[info_cls][idx]['patch_path'] = img_list
+    pkl.dump(info, open('%s/nuscenes_img_dbinfos_train.pkl' % data_root, 'wb'))
 
+def union(data_root):
+    dbinfo = pkl.load(open('%s/nuscenes_dbinfos_train.pkl' % data_root, 'rb'))
+    idbinfo = pkl.load(open('%s/nuscenes_imgdbinfos_train.pkl' % data_root, 'rb'))
+    for cls in dbinfo:
+        for idx in range(len(dbinfo[cls])):
+            dbinfo[cls][idx]['patch_path'] = idbinfo[cls][idx]
+    pkl.dump(dbinfo, open('%s/nuscenes_img_dbinfos_train.pkl' % data_root, 'wb'))
 
 if __name__ == '__main__':
     fire.Fire()

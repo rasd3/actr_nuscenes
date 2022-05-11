@@ -276,7 +276,10 @@ class DataBaseSampler(object):
             }
             if img is not None:
                 gt_tokens = [a['image_idx'] for a in sampled]
+                patch_paths = [a['patch_path'] for a in sampled]
                 ret['gt_tokens'] = gt_tokens
+                ret['patch_paths'] = patch_paths
+                ret['points_list'] = s_points_list
 
         return ret
 
